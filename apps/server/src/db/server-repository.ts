@@ -23,8 +23,8 @@ type ServerRow = {
 export interface ServerRepository {
   list(): ServerRecord[]
   get(id: string): ServerRecord | undefined
-  create(input: ServerInput, credentialId?: string): ServerRecord
-  update(id: string, input: ServerInput, credentialId?: string): ServerRecord
+  create(input: ServerInput, credentialId?: string | null, id?: string): ServerRecord
+  update(id: string, input: ServerInput, credentialId?: string | null): ServerRecord
   setFingerprint(id: string, fingerprint: string): ServerRecord
   delete(id: string): void
 }
@@ -65,9 +65,9 @@ export class SqliteServerRepository implements ServerRepository {
     return row ? mapRow(row) : undefined
   }
 
-  create(input: ServerInput, credentialId?: string): ServerRecord {
+  create(input: ServerInput, credentialId?: string | null, requestedId?: string): ServerRecord {
     const now = new Date().toISOString()
-    const id = randomUUID()
+    const id = requestedId ?? randomUUID()
     this.database.raw.prepare(`
       INSERT INTO servers
         (id, name, source, config_alias, host, port, username, auth_type, private_key_path, credential_id, notes, created_at, updated_at)
@@ -88,7 +88,8 @@ export class SqliteServerRepository implements ServerRepository {
         auth_type = ?, private_key_path = ?, credential_id = ?, notes = ?, updated_at = ? WHERE id = ?
     `).run(
       input.name, input.source, input.configAlias ?? null, input.host, input.port, input.username,
-      input.authType, input.privateKeyPath ?? null, credentialId ?? existing.credentialId ?? null,
+      input.authType, input.privateKeyPath ?? null,
+      credentialId === undefined ? existing.credentialId ?? null : credentialId,
       input.notes, new Date().toISOString(), id,
     )
     return this.get(id)!
