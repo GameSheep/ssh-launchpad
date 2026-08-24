@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "start": "node apps/control-plane/dist/main.js",
     "control:start": "node apps/control-plane/dist/main.js",
+    "local:start": "node apps/server/dist/local-bridge-main.js",
     "credential:verify": "tsx scripts/verify-windows-credential.ts"
   },
   "devDependencies": {

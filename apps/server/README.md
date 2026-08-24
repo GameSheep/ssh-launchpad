@@ -1,12 +1,19 @@
-# Server runtime
+# Server runtime and local SSH Bridge
 
-这个 workspace 包含 SSH Launchpad 的 SSH 会话、端口转发、应用运行时和 SQLite 仓储模块。生产部署只需要启动根目录的控制平面：
+这个 workspace 包含 SSH 会话、端口转发、应用运行时和 SQLite 仓储模块。
+
+公网控制平面启动：
 
 ```bash
 npm run build
 npm start
 ```
 
-控制平面直接导入这里的运行时模块，因此不需要在用户电脑上额外安装或运行 Agent。浏览器提交的 SSH 密码只用于当前连接，不会由本模块写入数据库；服务器记录和应用记录由控制平面保存到 `CONTROL_DATA_DIR`。
+需要在用户电脑上执行本地 SSH 时，启动 Bridge：
 
-旧版本中用于本地 Agent 的底层模块仍保留在源码中，方便兼容已有测试和后续迁移，但它不是当前部署路径，也不需要配置 `PAIRING_CODE`、`AGENT_NAME` 或单独启动 `agent:start`。
+```powershell
+$env:CONTROL_ORIGIN="https://tyyun.haibao.fun"
+npm run local:start
+```
+
+Bridge 只监听 `127.0.0.1:4319`，接收浏览器发来的服务器/应用记录和当前凭据，在本机建立 SSH 隧道。凭据只在进程内存中使用，不写入本地数据库；主机指纹和应用运行记录可以保存在 `LOCAL_BRIDGE_DATA_DIR`。

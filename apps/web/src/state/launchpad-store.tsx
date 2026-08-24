@@ -45,7 +45,8 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     setLoading(true)
     try {
       const value: BootstrapResponse = await api.bootstrap()
-      setServers(value.servers); setApps(value.apps); setRuntime(new Map(value.runtime.map((entry) => [entry.appId, entry])))
+      const localRuntime = await api.localRuntime().catch(() => undefined)
+      setServers(value.servers); setApps(value.apps); setRuntime(new Map((localRuntime ?? value.runtime).map((entry) => [entry.appId, entry])))
       setNeedsLogin(false); setAuthReady(true); setError('')
     } catch (cause) {
       if (cause instanceof ApiClientError && cause.code === 'SESSION_INVALID') { setNeedsLogin(true); setAuthReady(true); setError('') }
@@ -59,16 +60,8 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!authReady || needsLogin) return
-    const events = new EventSource('/api/events')
-    const onEvent = (event: MessageEvent<string>) => {
-      try {
-        const value = JSON.parse(event.data) as { snapshot?: RuntimeSnapshot; snapshots?: RuntimeSnapshot[] }
-        if (event.type === 'runtime' && value.snapshot) setRuntime((current) => new Map(current).set(value.snapshot!.appId, value.snapshot!))
-        if (event.type === 'snapshot' && value.snapshots) setRuntime(new Map(value.snapshots.map((entry) => [entry.appId, entry])))
-      } catch { /* ignore malformed event */ }
-    }
-    events.addEventListener('runtime', onEvent); events.addEventListener('snapshot', onEvent)
-    return () => events.close()
+    const timer = setInterval(() => { void api.localRuntime().then((snapshots) => setRuntime(new Map(snapshots.map((entry) => [entry.appId, entry])))).catch(() => undefined) }, 3000)
+    return () => clearInterval(timer)
   }, [authReady, needsLogin])
 
   const login = useCallback(async (token: string) => {
@@ -83,7 +76,9 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async (app: RemoteAppRecord, tab?: Window | null) => {
     try {
-      const result = await api.connect(app.id, app.serverId)
+      const server = servers.find((entry) => entry.id === app.serverId)
+      if (!server) throw new ApiClientError('NOT_FOUND', '应用所属的服务器不存在')
+      const result = await api.connect(app, server)
       if (tab) tab.location.href = result.url
       await refresh()
     } catch (cause) {
@@ -94,7 +89,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
       if (tab) tab.close()
       setError(cause instanceof Error ? cause.message : '连接失败')
     }
-  }, [refresh])
+  }, [refresh, servers])
   const confirmPendingFingerprint = useCallback(async () => {
     const pending = pendingFingerprint
     if (!pending) return
@@ -104,7 +99,9 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     setFingerprintBusy(true)
     try {
       await api.confirmFingerprint(pending.app.serverId, pending.candidateFingerprint)
-      const result = await api.connect(pending.app.id, pending.app.serverId)
+      const server = servers.find((entry) => entry.id === pending.app.serverId)
+      if (!server) throw new ApiClientError('NOT_FOUND', '应用所属的服务器不存在')
+      const result = await api.connect(pending.app, server)
       if (pending.tab) pending.tab.location.href = result.url
       await refresh()
     } catch (cause) {
@@ -113,7 +110,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     } finally {
       setFingerprintBusy(false)
     }
-  }, [pendingFingerprint, refresh])
+  }, [pendingFingerprint, refresh, servers])
   const rejectPendingFingerprint = useCallback(() => {
     pendingFingerprint?.tab?.close()
     setPendingFingerprint(undefined)

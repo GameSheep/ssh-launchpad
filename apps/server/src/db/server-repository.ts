@@ -80,7 +80,7 @@ export class SqliteServerRepository implements ServerRepository {
     return this.get(id)!
   }
 
-  update(id: string, input: ServerInput, credentialId?: string): ServerRecord {
+  update(id: string, input: ServerInput, credentialId?: string | null): ServerRecord {
     const existing = this.get(id)
     if (!existing) notFound(id)
     this.database.raw.prepare(`

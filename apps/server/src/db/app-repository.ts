@@ -29,7 +29,7 @@ type AppRow = {
 export interface AppRepository {
   list(serverId?: string): RemoteAppRecord[]
   get(id: string): RemoteAppRecord | undefined
-  create(input: RemoteAppInput): RemoteAppRecord
+  create(input: RemoteAppInput, requestedId?: string): RemoteAppRecord
   update(id: string, input: RemoteAppInput): RemoteAppRecord
   delete(id: string): void
   findByLocalPort(port: number, excludeId?: string): RemoteAppRecord | undefined
@@ -87,8 +87,8 @@ export class SqliteAppRepository implements AppRepository {
     return row ? mapRow(row as unknown as AppRow) : undefined
   }
 
-  create(input: RemoteAppInput): RemoteAppRecord {
-    const id = randomUUID()
+  create(input: RemoteAppInput, requestedId?: string): RemoteAppRecord {
+    const id = requestedId ?? randomUUID()
     const now = new Date().toISOString()
     try {
       this.database.raw.prepare(`
