@@ -15,6 +15,9 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  exchangeSession: (token: string) => request<{ ok: true }>('/api/session', { method: 'POST', body: JSON.stringify({ token }) }),
+  controlStatus: () => request<{ authenticated: true; agents: Array<{ id: string; name: string; connected: boolean }> }>('/api/control/status'),
+  createPairingCode: () => request<{ code: string; expiresAt: string }>('/api/agents/pairing-codes', { method: 'POST', body: '{}' }),
   bootstrap: () => request<BootstrapResponse>('/api/bootstrap'),
   servers: () => request<ServerRecord[]>('/api/servers'),
   createServer: (server: ServerInput, credential?: { kind: 'password' | 'private-key-passphrase'; value: string }) => request<ServerRecord>('/api/servers', { method: 'POST', body: JSON.stringify({ server, credential }) }),

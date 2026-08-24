@@ -1,0 +1,17 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile.control-plane
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CONTROL_DATA_DIR: /data
+      HOST: 0.0.0.0
+    ports:
+      - "4318:4318"
+    volumes:
+      - launchpad-control-data:/data
+
+volumes:
+  launchpad-control-data:

@@ -7,6 +7,11 @@ interface LaunchpadContextValue {
   apps: RemoteAppRecord[]
   runtime: Map<string, RuntimeSnapshot>
   loading: boolean
+  authReady: boolean
+  needsLogin: boolean
+  agentOffline: boolean
+  login(token: string): Promise<void>
+  createPairingCode(): Promise<{ code: string; expiresAt: string }>
   error: string
   pendingFingerprint?: { app: RemoteAppRecord; tab: Window | null; candidateFingerprint: string }
   fingerprintBusy: boolean
@@ -31,6 +36,9 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
   const [apps, setApps] = useState<RemoteAppRecord[]>([])
   const [runtime, setRuntime] = useState<Map<string, RuntimeSnapshot>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [authReady, setAuthReady] = useState(false)
+  const [needsLogin, setNeedsLogin] = useState(false)
+  const [agentOffline, setAgentOffline] = useState(false)
   const [error, setError] = useState('')
   const [pendingFingerprint, setPendingFingerprint] = useState<LaunchpadContextValue['pendingFingerprint']>()
   const [fingerprintBusy, setFingerprintBusy] = useState(false)
@@ -40,12 +48,20 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     try {
       const value: BootstrapResponse = await api.bootstrap()
       setServers(value.servers); setApps(value.apps); setRuntime(new Map(value.runtime.map((entry) => [entry.appId, entry])))
-      setError('')
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '无法加载工作台') } finally { setLoading(false) }
+      setNeedsLogin(false); setAgentOffline(false); setAuthReady(true); setError('')
+    } catch (cause) {
+      if (cause instanceof ApiClientError && cause.code === 'SESSION_INVALID') { setNeedsLogin(true); setAgentOffline(false); setAuthReady(true); setError('') }
+      else if (cause instanceof ApiClientError && cause.code === 'AGENT_OFFLINE') { setNeedsLogin(false); setAgentOffline(true); setAuthReady(true); setError('') }
+      else { setAuthReady(true); setError(cause instanceof Error ? cause.message : '无法加载工作台') }
+    } finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
     void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!authReady || needsLogin || agentOffline) return
     const events = new EventSource('/api/events')
     const onEvent = (event: MessageEvent<string>) => {
       try {
@@ -56,7 +72,14 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     }
     events.addEventListener('runtime', onEvent); events.addEventListener('snapshot', onEvent)
     return () => events.close()
+  }, [agentOffline, authReady, needsLogin])
+
+  const login = useCallback(async (token: string) => {
+    await api.exchangeSession(token)
+    setNeedsLogin(false); setAgentOffline(false); setAuthReady(true)
+    await refresh()
   }, [refresh])
+  const createPairingCode = useCallback(() => api.createPairingCode(), [])
 
   const run = useCallback(async <T,>(operation: () => Promise<T>): Promise<T> => {
     try { const result = await operation(); setError(''); await refresh(); return result } catch (cause) { setError(cause instanceof ApiClientError ? cause.message : cause instanceof Error ? cause.message : '操作失败'); throw cause }
@@ -100,7 +123,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     setPendingFingerprint(undefined)
   }, [pendingFingerprint])
   const value = useMemo<LaunchpadContextValue>(() => ({
-    servers, apps, runtime, loading, error, fingerprintBusy, ...(pendingFingerprint ? { pendingFingerprint } : {}), refresh,
+    servers, apps, runtime, loading, error, fingerprintBusy, authReady, needsLogin, agentOffline, login, createPairingCode, ...(pendingFingerprint ? { pendingFingerprint } : {}), refresh,
     createServer: (input, credential) => run(() => api.createServer(input, credential)),
     updateServer: (id, input, credential) => run(() => api.updateServer(id, input, credential)),
     removeServer: (id) => run(() => api.deleteServer(id).then(() => undefined)),
@@ -112,7 +135,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     rejectPendingFingerprint,
     disconnect: (appId) => run(() => api.disconnect(appId).then(() => undefined)),
     clearError: () => setError(''),
-  }), [apps, confirmPendingFingerprint, connect, error, fingerprintBusy, loading, pendingFingerprint, refresh, rejectPendingFingerprint, run, runtime, servers])
+  }), [agentOffline, apps, authReady, confirmPendingFingerprint, connect, createPairingCode, error, fingerprintBusy, loading, login, needsLogin, pendingFingerprint, refresh, rejectPendingFingerprint, run, runtime, servers])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
 

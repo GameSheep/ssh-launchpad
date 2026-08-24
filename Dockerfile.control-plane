@@ -1,0 +1,20 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps ./apps
+COPY packages ./packages
+COPY tsconfig.base.json vitest.base.config.ts ./
+RUN npm ci
+RUN npm run build
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/apps ./apps
+COPY --from=build /app/packages ./packages
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/tsconfig.base.json ./
+VOLUME ["/data"]
+EXPOSE 4318
+CMD ["node", "apps/control-plane/dist/main.js"]
