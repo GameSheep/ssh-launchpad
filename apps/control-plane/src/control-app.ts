@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import cookie from '@fastify/cookie'
 import fastifyStatic from '@fastify/static'
 import websocket from '@fastify/websocket'
@@ -32,9 +32,11 @@ export async function buildControlApp(dependencies: ControlAppDependencies): Pro
   const app = Fastify({ logger: false })
   await app.register(cookie)
   await app.register(websocket)
+  app.addContentTypeParser(/^application\/(?:x-www-form-urlencoded|octet-stream)|^multipart\//, { parseAs: 'buffer' }, (_request, payload, done) => done(null, payload))
   app.addHook('onRequest', async (request: FastifyRequest) => {
     if (!hostAllowed(request.headers.host, dependencies.publicBaseUrl) || !originAllowed(request.headers.origin, dependencies.publicBaseUrl)) throw new LaunchpadError('FORBIDDEN', 'Request origin is not allowed')
     if (request.url.startsWith('/agent')) return
+    if (request.url.startsWith('/tunnel/')) return
     if (request.method === 'POST' && request.url === '/api/session') return
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
     if (mutation && (!request.headers['content-type'] || !request.headers['content-type'].toLowerCase().startsWith('application/json'))) throw new LaunchpadError('VALIDATION_FAILED', 'Mutating requests must use application/json')
