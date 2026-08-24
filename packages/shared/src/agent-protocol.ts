@@ -6,6 +6,7 @@ export type AgentMethod =
   | 'servers.create'
   | 'servers.update'
   | 'servers.remove'
+  | 'servers.importSshConfig'
   | 'servers.test'
   | 'servers.confirmFingerprint'
   | 'servers.setCredential'
@@ -19,6 +20,13 @@ export type AgentMethod =
   | 'apps.reconnect'
   | 'apps.logs'
   | 'apps.proxy'
+
+const agentMethods = new Set<AgentMethod>([
+  'bootstrap', 'servers.list', 'servers.create', 'servers.update', 'servers.remove', 'servers.importSshConfig', 'servers.test',
+  'servers.confirmFingerprint', 'servers.setCredential', 'servers.deleteCredential', 'apps.list',
+  'apps.create', 'apps.update', 'apps.remove', 'apps.connect', 'apps.disconnect', 'apps.reconnect',
+  'apps.logs', 'apps.proxy',
+])
 
 export interface AgentErrorBody {
   code: string
@@ -47,6 +55,12 @@ export interface AgentHelloMessage {
   name: string
 }
 
+export interface AgentPairedMessage {
+  type: 'paired'
+  agentId: string
+  token: string
+}
+
 export interface AgentRequest {
   type: 'request'
   id: string
@@ -73,7 +87,7 @@ export interface AgentEventMessage {
   event: RuntimeEvent
 }
 
-export type AgentMessage = AgentPairMessage | AgentHelloMessage | AgentRequest | AgentSuccessResponse | AgentFailureResponse | AgentEventMessage
+export type AgentMessage = AgentPairMessage | AgentHelloMessage | AgentPairedMessage | AgentRequest | AgentSuccessResponse | AgentFailureResponse | AgentEventMessage
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Agent message must be an object')
@@ -90,7 +104,12 @@ export function parseAgentMessage(value: unknown): AgentMessage {
   const type = stringField(data.type, 'type')
   if (type === 'pair') return { type, code: stringField(data.code, 'code'), name: stringField(data.name, 'name') }
   if (type === 'hello') return { type, agentId: stringField(data.agentId, 'agentId'), token: stringField(data.token, 'token'), name: stringField(data.name, 'name') }
-  if (type === 'request') return { type, id: stringField(data.id, 'id'), method: stringField(data.method, 'method') as AgentMethod, payload: data.payload }
+  if (type === 'paired') return { type, agentId: stringField(data.agentId, 'agentId'), token: stringField(data.token, 'token') }
+  if (type === 'request') {
+    const method = stringField(data.method, 'method')
+    if (!agentMethods.has(method as AgentMethod)) throw new Error('Unknown Agent method')
+    return { type, id: stringField(data.id, 'id'), method: method as AgentMethod, payload: data.payload }
+  }
   if (type === 'event') {
     if (!data.event || typeof data.event !== 'object') throw new Error('Invalid Agent event')
     return { type, event: data.event as RuntimeEvent }
