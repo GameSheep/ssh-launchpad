@@ -7,6 +7,7 @@ import type { ServerConnectionService } from '../ssh/server-connection-service.j
 import type { AppRepository } from '../db/app-repository.js'
 import type { AppRuntimeService } from '../runtime/types.js'
 import type { IconStore } from '../icons/icon-store.js'
+import type { RuntimeEventBus } from '../runtime/types.js'
 
 export interface ApiRouteDependencies {
   servers: ServerService
@@ -14,6 +15,7 @@ export interface ApiRouteDependencies {
   apps: AppRepository
   runtime: AppRuntimeService
   icons: IconStore
+  events: RuntimeEventBus
 }
 
 function body(request: FastifyRequest): Record<string, unknown> {
@@ -31,7 +33,8 @@ export async function registerRoutes(app: FastifyInstance, dependencies: ApiRout
   app.get('/api/bootstrap', async (_request, reply) => {
     if (!reply.hasHeader('set-cookie')) reply.setCookie('launchpad_session', (app as FastifyInstance & { sessionToken?: string }).sessionToken ?? '', { httpOnly: true, sameSite: 'strict', path: '/' })
     const servers = dependencies.servers.list()
-    return { servers, apps: dependencies.apps.list(), runtime: [] }
+    const runtime = dependencies.events.snapshotsList?.() ?? []
+    return { servers, apps: dependencies.apps.list(), runtime }
   })
   app.get('/api/servers', async () => dependencies.servers.list())
   app.post('/api/servers', async (request) => {
@@ -74,8 +77,8 @@ export async function registerRoutes(app: FastifyInstance, dependencies: ApiRout
   app.post('/api/icons', async (request) => {
     const data = body(request)
     if (typeof data.mimeType !== 'string' || typeof data.dataBase64 !== 'string') throw new LaunchpadError('VALIDATION_FAILED', 'mimeType and dataBase64 are required')
-    let bytes: Buffer
-    try { bytes = Buffer.from(data.dataBase64, 'base64') } catch { throw new LaunchpadError('VALIDATION_FAILED', 'Invalid base64 icon data') }
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data.dataBase64)) throw new LaunchpadError('VALIDATION_FAILED', 'Invalid base64 icon data')
+    const bytes = Buffer.from(data.dataBase64, 'base64')
     const icon = await dependencies.icons.save(data.mimeType, bytes)
     return { id: icon.id, mimeType: icon.mimeType }
   })

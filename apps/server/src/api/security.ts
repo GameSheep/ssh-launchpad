@@ -29,7 +29,7 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     }
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
     if (!mutation) return
-    if (request.headers['content-type'] && !request.headers['content-type'].toLowerCase().startsWith('application/json')) {
+    if (!request.headers['content-type'] || !request.headers['content-type'].toLowerCase().startsWith('application/json')) {
       throw new LaunchpadError('VALIDATION_FAILED', 'Mutating requests must use application/json')
     }
     if (request.cookies.launchpad_session !== options.sessionToken) {

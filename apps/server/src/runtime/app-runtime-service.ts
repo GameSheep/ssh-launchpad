@@ -56,7 +56,8 @@ export class AppRuntimeServiceImpl implements AppRuntimeService {
     if (!entry) return
     this.active.delete(appId)
     entry.removeDisconnect()
-    if (entry.startedByLaunchpad && entry.app.stopOnDisconnect && entry.app.stopCommand) {
+    const otherOnServer = [...this.active.values()].some((candidate) => candidate.server.id === entry.server.id && candidate.app.id !== appId)
+    if (!otherOnServer && entry.startedByLaunchpad && entry.app.stopOnDisconnect && entry.app.stopCommand) {
       await entry.lease.session.exec(entry.app.stopCommand, entry.app.startTimeoutMs).catch(() => undefined)
     }
     await entry.tunnel?.close().catch(() => undefined)
@@ -123,8 +124,13 @@ export class AppRuntimeServiceImpl implements AppRuntimeService {
   }
 
   private async handleUnexpectedDisconnect(appId: string): Promise<void> {
-    if (!this.active.has(appId)) return
+    const previous = this.active.get(appId)
+    if (!previous) return
     this.active.delete(appId)
+    previous.removeDisconnect()
+    await previous.tunnel?.close().catch(() => undefined)
+    await previous.reservation.release().catch(() => undefined)
+    await previous.lease.release().catch(() => undefined)
     for (const delay of [1000, 3000, 10000]) {
       await this.publish(snapshot(appId, 'connecting'))
       await new Promise((resolve) => setTimeout(resolve, delay))
