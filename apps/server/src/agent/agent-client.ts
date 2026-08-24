@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import WebSocket from 'ws'
 import { LaunchpadError, parseAgentMessage, type AgentEventMessage, type AgentFailureResponse, type AgentHelloMessage, type AgentMessage, type AgentPairedMessage, type AgentRequest, type AgentSuccessResponse } from '@ssh-launchpad/shared'
@@ -69,8 +69,18 @@ export class AgentClient {
   }
 
   private async handleMessage(raw: string, onHandshake: () => void): Promise<void> {
+    let rawValue: { type?: string; error?: { code?: string } }
+    try { rawValue = JSON.parse(raw) as { type?: string; error?: { code?: string } } } catch { this.socket?.close(); return }
+    if (rawValue.type === 'error') {
+      if (rawValue.error?.code === 'PAIRING_INVALID' && this.options.pairingCode) {
+        this.token = undefined
+        await unlink(this.options.tokenPath).catch(() => undefined)
+      }
+      this.socket?.close()
+      return
+    }
     let message: AgentMessage
-    try { message = parseAgentMessage(JSON.parse(raw)) } catch { this.socket?.close(); return }
+    try { message = parseAgentMessage(rawValue) } catch { this.socket?.close(); return }
     if (message.type === 'paired') {
       const paired: AgentPairedMessage = message; this.token = { agentId: paired.agentId, token: paired.token }; await this.saveToken(this.token); onHandshake(); return
     }
