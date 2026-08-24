@@ -59,6 +59,9 @@ kbd { padding: 3px 7px; color: #8d8278; border: 1px solid rgba(255,255,255,.1); 
 .server-tabs button.active { color: #fff9ef; }
 .server-tabs button.active::after { content: ''; position: absolute; height: 2px; left: 12px; right: 12px; bottom: -1px; background: var(--orange); }
 .server-tabs small { color: #746a63; font: 10px 'DM Mono', monospace; }
+.server-tab-group { display: inline-flex; align-items: stretch; flex: 0 0 auto; }
+.server-tab-edit { padding: 9px 6px 11px !important; color: #746a63 !important; font-size: 11px !important; opacity: .75; }
+.server-tab-edit:hover { color: var(--orange) !important; }
 .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #5e817f; box-shadow: 0 0 0 3px rgba(94,129,127,.13); }
 .tab-dot.all { background: var(--orange); box-shadow: 0 0 0 3px rgba(255,156,66,.14); }
 .tab-manage { margin-left: auto; color: var(--orange) !important; }
