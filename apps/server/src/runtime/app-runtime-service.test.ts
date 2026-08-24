@@ -3,7 +3,7 @@ import type { RemoteAppRecord, ServerRecord } from '@ssh-launchpad/shared'
 import type { AppRepository } from '../db/app-repository.js'
 import type { ServerRepository } from '../db/server-repository.js'
 import type { SessionLease, SessionPool, SshSession } from '../ssh/ssh-session.js'
-import type { PortReservation, TunnelHandle, TunnelManager } from '../tunnels/tunnel-manager.js'
+import type { PortReservation, TunnelManager } from '../tunnels/tunnel-manager.js'
 import { InMemoryRuntimeEventBus } from './event-bus.js'
 import { AppRuntimeServiceImpl } from './app-runtime-service.js'
 

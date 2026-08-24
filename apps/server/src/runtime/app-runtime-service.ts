@@ -2,7 +2,7 @@ import type { RemoteAppRecord, RuntimeSnapshot, ServerRecord } from '@ssh-launch
 import { LaunchpadError } from '@ssh-launchpad/shared'
 import type { AppRepository } from '../db/app-repository.js'
 import type { ServerRepository } from '../db/server-repository.js'
-import type { SessionLease, SessionPool, SshSession } from '../ssh/ssh-session.js'
+import type { SessionLease, SessionPool } from '../ssh/ssh-session.js'
 import type { PortReservation, TunnelHandle, TunnelManager } from '../tunnels/tunnel-manager.js'
 import type { AppRuntimeService, ConnectResult, HealthChecker, LogStore, RuntimeEventBus } from './types.js'
 

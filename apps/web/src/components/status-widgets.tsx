@@ -1,0 +1,3 @@
+export function StatusWidgets({ serverCount, healthyCount }: { serverCount: number; healthyCount: number }) {
+  return <aside className="widgets"><div className="widget weather"><div className="widget-label">工作台状态</div><div className="widget-value">{healthyCount}<span> 个在线</span></div><div className="widget-muted">连接中的应用</div><div className="widget-orbit"><span>◌</span><span>◌</span><span>◌</span></div></div><div className="widget calendar"><div className="widget-label">本地隧道</div><div className="calendar-big">{String(serverCount).padStart(2, '0')}</div><div className="widget-muted">已保存服务器</div><div className="calendar-rule" /></div></aside>
+}
