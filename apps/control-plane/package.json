@@ -13,6 +13,7 @@
     "@fastify/static": "^9.0.0",
     "@fastify/websocket": "^11.2.0",
     "@ssh-launchpad/shared": "*",
+    "@ssh-launchpad/server": "*",
     "fastify": "^5.12.1",
     "ws": "^8.18.3"
   },

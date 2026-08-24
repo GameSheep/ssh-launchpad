@@ -19,9 +19,9 @@ export interface HealthChecker {
 export interface ConnectResult { url: string; status: 'healthy' }
 
 export interface AppRuntimeService {
-  connect(appId: string): Promise<ConnectResult>
+  connect(appId: string, credential?: string): Promise<ConnectResult>
   disconnect(appId: string): Promise<void>
-  reconnect(appId: string): Promise<ConnectResult>
+  reconnect(appId: string, credential?: string): Promise<ConnectResult>
   getLogs(appId: string): Promise<string[]>
   shutdown(): Promise<void>
 }

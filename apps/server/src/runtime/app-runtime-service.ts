@@ -38,17 +38,17 @@ export class AppRuntimeServiceImpl implements AppRuntimeService {
 
   constructor(private readonly dependencies: RuntimeDependencies) {}
 
-  async connect(appId: string): Promise<ConnectResult> {
+  async connect(appId: string, credential?: string): Promise<ConnectResult> {
     const existing = this.inFlight.get(appId)
     if (existing) return existing
-    const promise = this.connectInternal(appId)
+    const promise = this.connectInternal(appId, credential)
     this.inFlight.set(appId, promise)
     try { return await promise } finally { this.inFlight.delete(appId) }
   }
 
-  async reconnect(appId: string): Promise<ConnectResult> {
+  async reconnect(appId: string, credential?: string): Promise<ConnectResult> {
     await this.disconnect(appId)
-    return this.connect(appId)
+    return this.connect(appId, credential)
   }
 
   async disconnect(appId: string): Promise<void> {
@@ -76,7 +76,7 @@ export class AppRuntimeServiceImpl implements AppRuntimeService {
     await this.dependencies.sessions.closeAll()
   }
 
-  private async connectInternal(appId: string): Promise<ConnectResult> {
+  private async connectInternal(appId: string, credential?: string): Promise<ConnectResult> {
     const app = this.dependencies.apps.get(appId)
     if (!app) throw new LaunchpadError('NOT_FOUND', `Application ${appId} was not found`, { resource: 'app', id: appId })
     const server = this.dependencies.servers.get(app.serverId)
@@ -89,7 +89,7 @@ export class AppRuntimeServiceImpl implements AppRuntimeService {
     try {
       reservation = await this.dependencies.tunnels.reserve(app.id, app.localPort)
       await this.publish(snapshot(appId, 'connecting'))
-      lease = await this.dependencies.sessions.acquire(server)
+      lease = await this.dependencies.sessions.acquire(server, credential)
       let open = await lease.session.probe(app.remoteHost, app.remotePort)
       if (!open) {
         if (!app.autoStart || !app.startCommand) throw new LaunchpadError('REMOTE_PORT_CLOSED', 'Remote application port is closed')

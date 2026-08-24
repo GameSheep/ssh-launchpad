@@ -9,11 +9,11 @@ export class DefaultSessionPool implements SessionPool {
 
   constructor(private readonly factory: SshSessionFactory, private readonly credentials: CredentialStore) {}
 
-  async acquire(server: ServerRecord): Promise<SessionLease> {
+  async acquire(server: ServerRecord, secret?: string): Promise<SessionLease> {
     let entry = this.sessions.get(server.id)
     if (!entry) {
-      const secret = server.credentialId ? await this.credentials.get(server.credentialId) : undefined
-      const session = await this.factory.connect(server, secret)
+      const storedSecret = secret ?? (server.credentialId ? await this.credentials.get(server.credentialId) : undefined)
+      const session = await this.factory.connect(server, storedSecret)
       entry = { session, leases: 0, removeDisconnect: () => undefined }
       entry.removeDisconnect = session.onDisconnect(() => {
         const current = this.sessions.get(server.id)

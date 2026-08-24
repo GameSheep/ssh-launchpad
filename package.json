@@ -19,9 +19,8 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run --config vitest.base.config.ts",
     "test:e2e": "playwright test",
-    "start": "npm run start -w @ssh-launchpad/control-plane",
-    "control:start": "npm run start -w @ssh-launchpad/control-plane",
-    "agent:start": "npm run start -w @ssh-launchpad/server",
+    "start": "node apps/control-plane/dist/main.js",
+    "control:start": "node apps/control-plane/dist/main.js",
     "credential:verify": "tsx scripts/verify-windows-credential.ts"
   },
   "devDependencies": {

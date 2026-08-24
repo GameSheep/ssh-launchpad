@@ -24,7 +24,7 @@ export interface SshSessionFactory {
 }
 
 export interface SessionLease { session: SshSession; release(): Promise<void> }
-export interface SessionPool { acquire(server: ServerRecord): Promise<SessionLease>; closeAll(): Promise<void> }
+export interface SessionPool { acquire(server: ServerRecord, secret?: string): Promise<SessionLease>; closeAll(): Promise<void> }
 
 function mapConnectionError(error: unknown, candidate: string | undefined, expected: string | undefined): LaunchpadError {
   const message = error instanceof Error ? error.message : String(error)

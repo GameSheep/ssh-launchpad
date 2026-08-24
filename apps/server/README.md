@@ -1,14 +1,12 @@
-# SSH Launchpad Agent
+# Server runtime
 
-Agent 是本地运行时，不提供浏览器页面，也不监听 HTTP 端口。它负责读取本机 SSH config、保存凭据、建立 SSH 会话/端口转发，并通过出站 WebSocket 调用控制平面。
+这个 workspace 包含 SSH Launchpad 的 SSH 会话、端口转发、应用运行时和 SQLite 仓储模块。生产部署只需要启动根目录的控制平面：
 
-从项目根目录启动：
-
-```powershell
-$env:CONTROL_URL = "https://launchpad.example.com"
-$env:PAIRING_CODE = "首次配对时页面生成的六位代码"
-$env:AGENT_NAME = "我的 Windows"
-npm run agent:start
+```bash
+npm run build
+npm start
 ```
 
-首次配对成功后，令牌保存在 `%LOCALAPPDATA%\ssh-launchpad\agent-token.json`。后续启动不需要 `PAIRING_CODE`。SSH 凭据只会写入 Windows Credential Manager，数据库和日志也只在本机保存。
+控制平面直接导入这里的运行时模块，因此不需要在用户电脑上额外安装或运行 Agent。浏览器提交的 SSH 密码只用于当前连接，不会由本模块写入数据库；服务器记录和应用记录由控制平面保存到 `CONTROL_DATA_DIR`。
+
+旧版本中用于本地 Agent 的底层模块仍保留在源码中，方便兼容已有测试和后续迁移，但它不是当前部署路径，也不需要配置 `PAIRING_CODE`、`AGENT_NAME` 或单独启动 `agent:start`。
