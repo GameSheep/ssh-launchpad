@@ -1,11 +1,11 @@
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { AppRuntimeServiceImpl, DefaultServerConnectionService, DefaultSessionPool, DefaultSshSessionFactory, DefaultTunnelManager, FetchHealthChecker, FileLogStore, InMemoryCredentialStore, InMemoryRuntimeEventBus, SqliteAppRepository, SqliteServerRepository, openDatabase } from './index.js'
+import { AppRuntimeServiceImpl, DefaultServerConnectionService, DefaultSessionPool, DefaultSshSessionFactory, DefaultTunnelManager, FetchHealthChecker, InMemoryCredentialStore, InMemoryLogStore, InMemoryRuntimeEventBus, SqliteAppRepository, SqliteServerRepository, openDatabase } from './index.js'
 import { buildLocalBridge } from './local-bridge.js'
 
 async function main(): Promise<void> {
-  const dataDir = process.env.LOCAL_BRIDGE_DATA_DIR ?? join(process.env.LOCALAPPDATA ?? join(homedir(), '.ssh-launchpad-local'), 'ssh-launchpad-local')
-  const database = openDatabase(join(dataDir, 'launchpad.db'))
+  // The browser is the source of truth. The local bridge keeps only an
+  // in-memory copy for active SSH sessions and never writes config or secrets
+  // to disk.
+  const database = openDatabase(':memory:')
   const servers = new SqliteServerRepository(database)
   const apps = new SqliteAppRepository(database)
   const credentials = new InMemoryCredentialStore()
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   const sessions = new DefaultSessionPool(factory, credentials)
   const tunnels = new DefaultTunnelManager()
   const events = new InMemoryRuntimeEventBus()
-  const logs = new FileLogStore(join(dataDir, 'logs'))
+  const logs = new InMemoryLogStore()
   const health = new FetchHealthChecker()
   const runtime = new AppRuntimeServiceImpl({ apps, servers, sessions, tunnels, events, logs, health })
   const allowedOrigins = (process.env.CONTROL_ORIGIN ?? 'http://localhost:5173').split(',').map((value) => value.trim()).filter(Boolean)

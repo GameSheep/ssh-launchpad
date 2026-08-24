@@ -65,7 +65,10 @@ export async function registerControlRoutes(app: FastifyInstance, dependencies: 
     return { ok: true }
   })
 
-  app.get('/api/bootstrap', async (request) => { requireSession(request, dependencies); return { servers: dependencies.servers.list(), apps: dependencies.apps.list(), runtime: dependencies.events.snapshotsList?.() ?? [] } })
+  // Workspace records are intentionally browser-owned. The control plane only
+  // authenticates the session and serves the Web UI; it must not send or
+  // persist the user's SSH configuration as part of bootstrap.
+  app.get('/api/bootstrap', async (request) => { requireSession(request, dependencies); return { servers: [], apps: [], runtime: [] } })
   app.get('/api/servers', async (request) => { requireSession(request, dependencies); return dependencies.servers.list() })
   app.post('/api/servers', async (request) => { requireSession(request, dependencies); const value = body(request); return dependencies.servers.create(serverInputSchema.parse(value.server ?? value) as ServerInput) })
   app.patch('/api/servers/:id', async (request) => { requireSession(request, dependencies); const value = body(request); return dependencies.servers.update(params(request).id, serverInputSchema.parse(value.server ?? value) as ServerInput) })

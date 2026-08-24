@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { ServerInput, ServerRecord } from '@ssh-launchpad/shared'
-import { api } from '../api/client.js'
 import { serverInputFromRecord } from './server-dialog-model.js'
+import { parseSshConfig } from '../state/ssh-config-parser.js'
 
 export function ServerDialog({ editing, onClose, onSave }: { editing?: ServerRecord; onClose(): void; onSave(input: ServerInput, credential?: { kind: 'password' | 'private-key-passphrase'; value: string }): Promise<void> }) {
   const [value, setValue] = useState<ServerInput>(() => serverInputFromRecord(editing))
@@ -12,7 +12,7 @@ export function ServerDialog({ editing, onClose, onSave }: { editing?: ServerRec
   const update = <K extends keyof ServerInput>(key: K, next: ServerInput[K]) => setValue((current) => ({ ...current, [key]: next }))
   const importConfig = async () => {
     try {
-      const result = await api.importSshConfig(configText); const host = result.hosts[0]
+      const result = parseSshConfig(configText); const host = result.hosts[0]
       if (!host) { setMessage('没有找到可导入的 Host'); return }
       update('configAlias', host.alias); update('host', host.host); update('port', host.port); update('username', host.username)
       if (host.identityFile) update('privateKeyPath', host.identityFile)

@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { BootstrapResponse, RemoteAppInput, RemoteAppRecord, RuntimeSnapshot, ServerInput, ServerRecord } from '@ssh-launchpad/shared'
+import type { RemoteAppInput, RemoteAppRecord, RuntimeSnapshot, ServerInput, ServerRecord } from '@ssh-launchpad/shared'
 import { api, ApiClientError } from '../api/client.js'
 import { browserCredentials } from './browser-credentials.js'
+import { browserWorkspace } from './browser-workspace.js'
 
 interface LaunchpadContextValue {
   servers: ServerRecord[]
@@ -44,9 +45,10 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const value: BootstrapResponse = await api.bootstrap()
+      await api.bootstrap()
+      const workspace = browserWorkspace.read()
       const localRuntime = await api.localRuntime().catch(() => undefined)
-      setServers(value.servers); setApps(value.apps); setRuntime(new Map((localRuntime ?? value.runtime).map((entry) => [entry.appId, entry])))
+      setServers(workspace.servers); setApps(workspace.apps); setRuntime(new Map((localRuntime ?? []).map((entry) => [entry.appId, entry])))
       setNeedsLogin(false); setAuthReady(true); setError('')
     } catch (cause) {
       if (cause instanceof ApiClientError && cause.code === 'SESSION_INVALID') { setNeedsLogin(true); setAuthReady(true); setError('') }
@@ -98,9 +100,8 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     setPendingFingerprint(undefined)
     setFingerprintBusy(true)
     try {
-      await api.confirmFingerprint(pending.app.serverId, pending.candidateFingerprint)
-      const server = servers.find((entry) => entry.id === pending.app.serverId)
-      if (!server) throw new ApiClientError('NOT_FOUND', '应用所属的服务器不存在')
+      const confirmed = await api.confirmFingerprint(pending.app.serverId, pending.candidateFingerprint)
+      const server = browserWorkspace.updateServerFingerprint(pending.app.serverId, confirmed.hostFingerprint ?? pending.candidateFingerprint)
       const result = await api.connect(pending.app, server)
       if (pending.tab) pending.tab.location.href = result.url
       await refresh()
@@ -117,18 +118,18 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
   }, [pendingFingerprint])
   const value = useMemo<LaunchpadContextValue>(() => ({
     servers, apps, runtime, loading, error, fingerprintBusy, authReady, needsLogin, login, ...(pendingFingerprint ? { pendingFingerprint } : {}), refresh,
-    createServer: (input) => run(() => api.createServer(input)),
-    updateServer: (id, input) => run(() => api.updateServer(id, input)),
-    removeServer: (id) => run(() => api.deleteServer(id).then(() => { browserCredentials.remove(id) })),
-    createApp: (input) => run(() => api.createApp(input)),
-    updateApp: (id, input) => run(() => api.updateApp(id, input)),
-    removeApp: (id) => run(() => api.deleteApp(id).then(() => undefined)),
     connect,
     confirmPendingFingerprint,
     rejectPendingFingerprint,
     disconnect: (appId) => run(() => api.disconnect(appId).then(() => undefined)),
     clearError: () => setError(''),
-  }), [apps, authReady, confirmPendingFingerprint, connect, error, fingerprintBusy, loading, login, needsLogin, pendingFingerprint, refresh, rejectPendingFingerprint, run, runtime, servers])
+    createServer: async (input) => { const result = browserWorkspace.createServer(input); await refresh(); return result },
+    updateServer: async (id, input) => { const result = browserWorkspace.updateServer(id, input); await refresh(); return result },
+    removeServer: async (id) => { browserWorkspace.deleteServer(id); browserCredentials.remove(id); await refresh() },
+    createApp: async (input) => { const result = browserWorkspace.createApp(input); await refresh(); return result },
+    updateApp: async (id, input) => { const result = browserWorkspace.updateApp(id, input); await refresh(); return result },
+    removeApp: async (id) => { browserWorkspace.deleteApp(id); await refresh() },
+  }), [apps, authReady, confirmPendingFingerprint, connect, error, fingerprintBusy, loading, login, needsLogin, pendingFingerprint, refresh, rejectPendingFingerprint, runtime, servers])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
 

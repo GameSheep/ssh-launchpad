@@ -18,7 +18,10 @@ async function main(): Promise<void> {
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? `http://localhost:${process.env.PORT ?? '4318'}`
   const dataDir = process.env.CONTROL_DATA_DIR ?? join(process.cwd(), '.control-plane')
   const controlDatabase = openControlDatabase(join(dataDir, 'control.db'))
-  const runtimeDatabase = openDatabase(join(dataDir, 'launchpad.db'))
+  // SSH workspace records belong to each browser. Keep the legacy runtime
+  // repositories in memory only so the control plane never writes them to
+  // its deployment directory.
+  const runtimeDatabase = openDatabase(':memory:')
   const credentials = new EphemeralCredentialStore()
   const serverRepository = new SqliteServerRepository(runtimeDatabase)
   const appRepository = new SqliteAppRepository(runtimeDatabase)

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import type { Client, ClientChannel, ConnectConfig } from 'ssh2'
 import { Client as Ssh2Client } from 'ssh2'
 import type { ServerRecord } from '@ssh-launchpad/shared'
@@ -6,6 +7,11 @@ import { LaunchpadError } from '@ssh-launchpad/shared'
 import { buildDetachedCommand } from './posix-command.js'
 
 const MAX_OUTPUT = 64 * 1024
+
+function resolvePrivateKeyPath(value: string): string {
+  const home = process.env.USERPROFILE ?? homedir()
+  return value.replace(/^~(?=$|[\\/])/, home).replace(/%USERPROFILE%/gi, home)
+}
 
 export interface ExecResult { stdout: string; stderr: string; exitCode: number | null }
 export interface DetachedProcess { pid: number; logPath: string }
@@ -65,7 +71,7 @@ export class Ssh2Session implements SshSession {
       if (server.authType === 'password' && secret) config.password = secret
       if (server.authType === 'private-key') {
         if (!server.privateKeyPath) throw new LaunchpadError('VALIDATION_FAILED', 'Private key path is required')
-        config.privateKey = await readFile(server.privateKeyPath)
+        config.privateKey = await readFile(resolvePrivateKeyPath(server.privateKeyPath))
         if (secret) config.passphrase = secret
       }
       if (server.authType === 'ssh-config') {
