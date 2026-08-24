@@ -26,6 +26,7 @@ use tokio::{
 };
 
 const DEFAULT_PORT: u16 = 4319;
+const DEFAULT_ORIGINS: &str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4318,http://127.0.0.1:4318,https://tyyun.haibao.fun";
 
 #[derive(Clone)]
 struct AppState {
@@ -234,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let origins = std::env::var("CONTROL_ORIGIN")
         .ok()
         .or(file_config.control_origin)
-        .unwrap_or_else(|| "http://localhost:5173,http://127.0.0.1:5173".into())
+        .unwrap_or_else(|| DEFAULT_ORIGINS.into())
         .split(',')
         .map(str::trim)
         .filter(|item| !item.is_empty())
@@ -265,6 +266,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("SSH Launchpad Rust Bridge listening on http://{address}");
     axum::serve(TcpListener::bind(address).await?, router).await?;
     Ok(())
+}
+
+#[cfg(test)]
+fn default_allowed_origins() -> Vec<String> {
+    DEFAULT_ORIGINS.split(',').map(ToOwned::to_owned).collect()
 }
 
 fn load_file_config() -> BridgeFileConfig {
@@ -826,5 +832,19 @@ fn map_handler_error(error: HandlerError) -> BridgeError {
             serde_json::json!({ "candidateFingerprint": fingerprint }),
         ),
         HandlerError::Ssh(error) => map_ssh_error(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::default_allowed_origins;
+
+    #[test]
+    fn default_origins_include_deployed_control_plane() {
+        assert!(
+            default_allowed_origins()
+                .iter()
+                .any(|origin| origin == "https://tyyun.haibao.fun")
+        );
     }
 }
