@@ -2,7 +2,7 @@
 
 日期：2026-08-24
 
-状态：已完成对话评审，等待书面规格最终确认
+状态：用户已正式确认
 
 ## 1. 背景
 
@@ -163,6 +163,8 @@ SSH Config 首版解析 `Host`、`HostName`、`Port`、`User` 和首个 `Identit
 | `stopCommand` | 显式停止命令，可空 |
 | `iconKind` | `preset`、`url`、`upload` 或 `letter` |
 | `iconValue` | 图标标识、URL、文件引用或缩写 |
+| `startTimeoutMs` | 等待远端启动的上限，默认 30000 |
+| `healthTimeoutMs` | 健康检查上限，默认 10000 |
 | `createdAt` / `updatedAt` | 时间戳 |
 
 DeepSeek Harness 模板预填远端端口 `3080` 与启动命令 `npx @deepseek-ai/dsh web --no-open`。模板值可以修改。
@@ -270,6 +272,7 @@ POST   /api/servers
 PATCH  /api/servers/:id
 DELETE /api/servers/:id
 POST   /api/servers/:id/test
+POST   /api/servers/:id/confirm-fingerprint
 POST   /api/servers/import-ssh-config
 
 GET    /api/apps
@@ -281,12 +284,17 @@ POST   /api/apps/:id/disconnect
 POST   /api/apps/:id/reconnect
 GET    /api/apps/:id/logs
 
+POST   /api/icons
+GET    /api/icons/:id
+
 PUT    /api/servers/:id/credential
 DELETE /api/servers/:id/credential
 GET    /api/events
 ```
 
 `GET /api/events` 是 Server-Sent Events 连接，推送应用状态和脱敏日志事件。秘密写入接口从不回显秘密。
+
+`POST /api/servers/:id/confirm-fingerprint` 只接受最近一次测试连接返回的候选指纹；任意指纹字符串不能直接写入。`POST /api/icons` 只接受 PNG、JPEG 或 WebP，解码后最大 512 KiB；首版不接受 SVG。
 
 ## 11. 安全设计
 
@@ -319,6 +327,11 @@ GET    /api/events
 - `TUNNEL_FAILED`
 - `HEALTH_CHECK_FAILED`
 - `CREDENTIAL_UNAVAILABLE`
+- `VALIDATION_FAILED`
+- `RESOURCE_BUSY`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `INTERNAL_ERROR`
 
 页面显示简短原因、建议操作和“查看日志”。原始错误保留在脱敏日志中，不将库内部堆栈直接展示给普通用户。
 
