@@ -107,3 +107,5 @@ kbd { padding: 3px 7px; color: #8d8278; border: 1px solid rgba(255,255,255,.1); 
 .fingerprint-card code { display: block; overflow: auto; margin: 18px 0 12px; padding: 12px; border: 1px solid rgba(158,232,223,.2); border-radius: 9px; color: var(--cyan); background: rgba(158,232,223,.06); font: 11px 'DM Mono', monospace; }
 .fingerprint-warning { color: #d9a86e; font-size: 10px; line-height: 1.6; }
 .fingerprint-card footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+.connection-toast { border-color: rgba(158,232,223,.3); background: rgba(25,45,45,.96); }
+.connection-toast > span { color: #1d3b38; background: var(--cyan); }

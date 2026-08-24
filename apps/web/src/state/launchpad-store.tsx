@@ -9,6 +9,7 @@ interface LaunchpadContextValue {
   loading: boolean
   error: string
   pendingFingerprint?: { app: RemoteAppRecord; tab: Window | null; candidateFingerprint: string }
+  fingerprintBusy: boolean
   refresh(): Promise<void>
   createServer(input: ServerInput, credential?: { kind: 'password' | 'private-key-passphrase'; value: string }): Promise<ServerRecord>
   updateServer(id: string, input: ServerInput, credential?: { kind: 'password' | 'private-key-passphrase'; value: string }): Promise<ServerRecord>
@@ -32,6 +33,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingFingerprint, setPendingFingerprint] = useState<LaunchpadContextValue['pendingFingerprint']>()
+  const [fingerprintBusy, setFingerprintBusy] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -77,14 +79,20 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
   const confirmPendingFingerprint = useCallback(async () => {
     const pending = pendingFingerprint
     if (!pending) return
+    // Close the confirmation surface immediately after the user commits. The
+    // browser tab may take a few seconds to finish SSH + health checks.
+    setPendingFingerprint(undefined)
+    setFingerprintBusy(true)
     try {
       await api.confirmFingerprint(pending.app.serverId, pending.candidateFingerprint)
       const result = await api.connect(pending.app.id)
       if (pending.tab) pending.tab.location.href = result.url
-      setPendingFingerprint(undefined)
       await refresh()
     } catch (cause) {
+      setPendingFingerprint(pending)
       setError(cause instanceof Error ? cause.message : '指纹确认失败')
+    } finally {
+      setFingerprintBusy(false)
     }
   }, [pendingFingerprint, refresh])
   const rejectPendingFingerprint = useCallback(() => {
@@ -92,7 +100,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     setPendingFingerprint(undefined)
   }, [pendingFingerprint])
   const value = useMemo<LaunchpadContextValue>(() => ({
-    servers, apps, runtime, loading, error, ...(pendingFingerprint ? { pendingFingerprint } : {}), refresh,
+    servers, apps, runtime, loading, error, fingerprintBusy, ...(pendingFingerprint ? { pendingFingerprint } : {}), refresh,
     createServer: (input, credential) => run(() => api.createServer(input, credential)),
     updateServer: (id, input, credential) => run(() => api.updateServer(id, input, credential)),
     removeServer: (id) => run(() => api.deleteServer(id).then(() => undefined)),
@@ -104,7 +112,7 @@ export function LaunchpadStore({ children }: { children: ReactNode }) {
     rejectPendingFingerprint,
     disconnect: (appId) => run(() => api.disconnect(appId).then(() => undefined)),
     clearError: () => setError(''),
-  }), [apps, confirmPendingFingerprint, connect, error, loading, pendingFingerprint, refresh, rejectPendingFingerprint, run, runtime, servers])
+  }), [apps, confirmPendingFingerprint, connect, error, fingerprintBusy, loading, pendingFingerprint, refresh, rejectPendingFingerprint, run, runtime, servers])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
 
