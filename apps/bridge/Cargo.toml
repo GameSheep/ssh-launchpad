@@ -1,0 +1,16 @@
+[package]
+name = "ssh-launchpad-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Small local SSH port-forwarding bridge for SSH Launchpad"
+license = "MIT"
+
+[dependencies]
+axum = "0.8.9"
+chrono = { version = "0.4.42", default-features = false, features = ["clock"] }
+russh = { version = "0.63.1", default-features = false, features = ["ring", "rsa"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+thiserror = "2.0.17"
+tokio = { version = "1.48.0", features = ["full"] }

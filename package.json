@@ -21,7 +21,10 @@
     "test:e2e": "playwright test",
     "start": "node apps/control-plane/dist/main.js",
     "control:start": "node apps/control-plane/dist/main.js",
-    "local:start": "node apps/server/dist/local-bridge-main.js",
+    "local:start": "cargo run --manifest-path apps/bridge/Cargo.toml --release",
+    "local:legacy": "node apps/server/dist/local-bridge-main.js",
+    "bridge:check": "cargo check --manifest-path apps/bridge/Cargo.toml",
+    "bridge:build": "cargo build --manifest-path apps/bridge/Cargo.toml --release",
     "credential:verify": "tsx scripts/verify-windows-credential.ts"
   },
   "devDependencies": {

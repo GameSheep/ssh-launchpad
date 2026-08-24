@@ -49,26 +49,27 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-## 在需要执行 SSH 的电脑启动本地 Bridge
+## 在需要执行 SSH 的电脑启动本地 Bridge（Rust）
 
-在你的 Windows 电脑上（不是公网服务器）执行一次：
+Bridge 是一个很小的 Rust 原生程序，只监听 `127.0.0.1:4319`。日常使用不需要安装 Node.js、npm 或 Git：从 GitHub Actions/Release 下载对应系统的可执行文件，在同一目录放置 `bridge-config.json`，然后双击运行即可。
 
-```powershell
-git clone https://github.com/GameSheep/ssh-launchpad.git
-cd ssh-launchpad
-npm install
-npm run build
-$env:CONTROL_ORIGIN="https://tyyun.haibao.fun"
-npm run local:start
+`bridge-config.json` 示例：
+
+```json
+{
+  "controlOrigin": "https://tyyun.haibao.fun"
+}
 ```
 
-Bridge 必须保持运行。它只绑定本机回环地址，默认地址为 `http://127.0.0.1:4319`。如果要换端口，需要同时设置：
+如需开发或自行编译，Windows 需要 Rust 和 Visual Studio C++ Build Tools：
 
 ```powershell
-$env:LOCAL_BRIDGE_PORT="5319"
+cargo build --manifest-path apps/bridge/Cargo.toml --release
 ```
 
-当前页面前端默认连接 4319 端口。SSH 服务器、私钥路径和本地端口都以这台电脑为准。
+生成的 Windows 程序位于 `apps/bridge/target/release/ssh-launchpad-bridge.exe`。Bridge 必须保持运行，但不需要开放任何公网端口；页面默认调用 `http://127.0.0.1:4319`。Bridge 端口固定为 4319，应用自己的本地转发端口仍在网页中单独配置。环境变量 `CONTROL_ORIGIN`、`LOCAL_BRIDGE_PORT` 和 `BRIDGE_CONFIG` 会覆盖配置文件值。
+
+SSH 服务器、私钥路径和本地端口都以运行 Bridge 的这台电脑为准。
 
 ## 第一次使用
 
@@ -90,6 +91,7 @@ http://127.0.0.1:13080/
 - 公网服务不保存服务器、应用或 SSH 凭据，只负责登录和提供前端页面。
 - Bridge 只监听 `127.0.0.1`，不会对公网开放。
 - `CONTROL_ORIGIN` 限制哪些网页可以调用本机 Bridge；请填写实际公网地址，不要使用 `*`。
+- `bridge-config.json` 只包含网页来源和监听端口，不包含 SSH 密码或服务器配置。
 - 首次 SSH 主机指纹保存到浏览器，指纹变化会阻止连接。
 - 启动和停止命令完全由用户填写，会在远程服务器上执行；不要粘贴不信任的命令。
 

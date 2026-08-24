@@ -1,0 +1,22 @@
+name: Build Rust Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/bridge/**"
+      - ".github/workflows/bridge.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build bridge
+        run: cargo build --manifest-path apps/bridge/Cargo.toml --release
+      - name: Upload bridge executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-launchpad-bridge-windows-x64
+          path: apps/bridge/target/release/ssh-launchpad-bridge.exe

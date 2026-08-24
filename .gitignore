@@ -1,6 +1,7 @@
 .superpowers/
 .worktrees/
 node_modules/
+apps/bridge/target/
 dist/
 coverage/
 *.log
