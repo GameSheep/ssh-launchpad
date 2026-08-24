@@ -69,9 +69,22 @@ export async function registerRoutes(app: FastifyInstance, dependencies: ApiRout
   app.post('/api/apps', async (request) => dependencies.apps.create(remoteAppInputSchema.parse(body(request).app ?? body(request)) as RemoteAppInput))
   app.patch('/api/apps/:id', async (request) => dependencies.apps.update((request.params as { id: string }).id, remoteAppInputSchema.parse(body(request).app ?? body(request)) as RemoteAppInput))
   app.delete('/api/apps/:id', async (request) => { const id = (request.params as { id: string }).id; dependencies.apps.delete(id); return { ok: true } })
-  app.post('/api/apps/:id/connect', async (request) => dependencies.runtime.connect((request.params as { id: string }).id))
+  const connectApp = async (request: FastifyRequest, reconnect = false) => {
+    const id = (request.params as { id: string }).id
+    try {
+      return await (reconnect ? dependencies.runtime.reconnect(id) : dependencies.runtime.connect(id))
+    } catch (error) {
+      if (error instanceof LaunchpadError && error.code === 'SSH_HOST_KEY_UNKNOWN') {
+        const application = dependencies.apps.get(id)
+        const candidate = error.details?.candidateFingerprint
+        if (application && typeof candidate === 'string') dependencies.serverConnections.rememberCandidate?.(application.serverId, candidate)
+      }
+      throw error
+    }
+  }
+  app.post('/api/apps/:id/connect', (request) => connectApp(request))
   app.post('/api/apps/:id/disconnect', async (request) => { await dependencies.runtime.disconnect((request.params as { id: string }).id); return { ok: true } })
-  app.post('/api/apps/:id/reconnect', async (request) => dependencies.runtime.reconnect((request.params as { id: string }).id))
+  app.post('/api/apps/:id/reconnect', (request) => connectApp(request, true))
   app.get('/api/apps/:id/logs', async (request) => dependencies.runtime.getLogs((request.params as { id: string }).id))
 
   app.post('/api/icons', async (request) => {

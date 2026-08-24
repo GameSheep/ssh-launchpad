@@ -7,6 +7,7 @@ import type { SshSessionFactory } from './ssh-session.js'
 export interface ServerConnectionService {
   test(serverId: string): Promise<{ ok: true } | { ok: false; candidateFingerprint: string }>
   confirmFingerprint(serverId: string, candidateFingerprint: string): ServerRecord
+  rememberCandidate?(serverId: string, candidateFingerprint: string): void
 }
 
 export class DefaultServerConnectionService implements ServerConnectionService {
@@ -46,6 +47,10 @@ export class DefaultServerConnectionService implements ServerConnectionService {
     const updated = this.servers.setFingerprint(serverId, candidateFingerprint)
     this.candidates.delete(serverId)
     return updated
+  }
+
+  rememberCandidate(serverId: string, candidateFingerprint: string): void {
+    this.candidates.set(serverId, candidateFingerprint)
   }
 }
 
