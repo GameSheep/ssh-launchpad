@@ -21,7 +21,8 @@ use russh::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
-    net::TcpListener,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
     sync::{Mutex, RwLock, watch},
 };
 
@@ -450,6 +451,11 @@ async fn connect_inner(
         .lock()
         .await
         .insert(request.app.id.clone(), tunnel);
+    if let Err(error) = check_local_health(&request.app).await {
+        stop_tunnel(&state, &request.app.id).await;
+        set_snapshot(&state, &request.app.id, "error", Some(&error)).await;
+        return Err(error);
+    }
     set_snapshot(&state, &request.app.id, "healthy", None).await;
     Ok(Json(ConnectResponse {
         url,
@@ -506,6 +512,53 @@ async fn stop_tunnel(state: &AppState, app_id: &str) {
         let _ = tunnel.stop.send(true);
         tunnel.task.abort();
     }
+}
+
+async fn check_local_health(app: &AppRecord) -> Result<(), BridgeError> {
+    // HTTPS health checks need a TLS client, which is intentionally not bundled
+    // into this small bridge. The browser will still perform the real check when
+    // it opens the returned URL.
+    if app.protocol != "http" {
+        return Ok(());
+    }
+    let timeout = Duration::from_millis(app.health_timeout_ms.max(1_000));
+    let mut socket =
+        tokio::time::timeout(timeout, TcpStream::connect(("127.0.0.1", app.local_port)))
+            .await
+            .map_err(|_| health_error(app))?
+            .map_err(|_| health_error(app))?;
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n\r\n",
+        app.health_path, app.local_port
+    );
+    tokio::time::timeout(timeout, socket.write_all(request.as_bytes()))
+        .await
+        .map_err(|_| health_error(app))?
+        .map_err(|_| health_error(app))?;
+    let mut response = [0u8; 1];
+    let bytes = tokio::time::timeout(timeout, socket.read(&mut response))
+        .await
+        .map_err(|_| health_error(app))?
+        .map_err(|_| health_error(app))?;
+    if bytes == 0 {
+        return Err(health_error(app));
+    }
+    Ok(())
+}
+
+fn health_error(app: &AppRecord) -> BridgeError {
+    BridgeError::with_details(
+        "HEALTH_CHECK_FAILED",
+        format!(
+            "Application did not return an HTTP response on local port {}; verify the remote port and process",
+            app.local_port
+        ),
+        serde_json::json!({
+            "remoteHost": app.remote_host,
+            "remotePort": app.remote_port,
+            "localPort": app.local_port,
+        }),
+    )
 }
 
 async fn set_snapshot(state: &AppState, app_id: &str, status: &str, error: Option<&BridgeError>) {
@@ -747,20 +800,72 @@ async fn start_tunnel(session: SessionHandle, app: &AppRecord) -> Result<Tunnel,
     let (stop, mut stopped) = watch::channel(false);
     let remote_host = app.remote_host.clone();
     let remote_port = app.remote_port as u32;
-    let local_port = app.local_port;
+    let app_id = app.id.clone();
     let task = tokio::spawn(async move {
         loop {
             tokio::select! {
                 _ = stopped.changed() => break,
                 result = listener.accept() => {
-                    let Ok((socket, origin)) = result else { break; };
+                    let Ok((mut socket, origin)) = result else { break; };
                     let session = session.clone();
                     let remote_host = remote_host.clone();
+                    let app_id = app_id.clone();
                     tokio::spawn(async move {
-                        if let Ok(channel) = session.lock().await.channel_open_direct_tcpip(remote_host, remote_port, origin.ip().to_string(), local_port as u32).await {
-                            let mut channel = channel.into_stream();
-                            let mut socket = socket;
-                            let _ = tokio::io::copy_bidirectional(&mut socket, &mut channel).await;
+                        let channel = session.lock().await.channel_open_direct_tcpip(
+                            remote_host,
+                            remote_port,
+                            origin.ip().to_string(),
+                            origin.port() as u32,
+                        ).await;
+                        let mut channel = match channel {
+                            Ok(channel) => channel,
+                            Err(error) => {
+                                eprintln!("[tunnel:{app_id}] SSH direct-tcpip channel open failed: {error:?}");
+                                return;
+                            }
+                        };
+
+                        // Relay the channel using russh's message API. This mirrors the
+                        // upstream direct-tcpip example and keeps SSH window/data events
+                        // flowing even when the remote HTTP server keeps the connection open.
+                        let mut stream_closed = false;
+                        let mut buffer = vec![0u8; 64 * 1024];
+                        loop {
+                            tokio::select! {
+                                read_result = socket.read(&mut buffer), if !stream_closed => {
+                                    match read_result {
+                                        Ok(0) => {
+                                            stream_closed = true;
+                                            if let Err(error) = channel.eof().await {
+                                                eprintln!("[tunnel:{app_id}] failed to send SSH EOF: {error:?}");
+                                                break;
+                                            }
+                                        }
+                                        Ok(bytes) => {
+                                            if let Err(error) = channel.data(&buffer[..bytes]).await {
+                                                eprintln!("[tunnel:{app_id}] failed to send request data: {error:?}");
+                                                break;
+                                            }
+                                        }
+                                        Err(error) => {
+                                            eprintln!("[tunnel:{app_id}] local socket read failed: {error}");
+                                            break;
+                                        }
+                                    }
+                                }
+                                message = channel.wait() => {
+                                    match message {
+                                        Some(ChannelMsg::Data { ref data }) => {
+                                            if let Err(error) = socket.write_all(data).await {
+                                                eprintln!("[tunnel:{app_id}] local socket write failed: {error}");
+                                                break;
+                                            }
+                                        }
+                                        Some(ChannelMsg::Eof | ChannelMsg::Close) | None => break,
+                                        Some(_) => {}
+                                    }
+                                }
+                            }
                         }
                     });
                 }
