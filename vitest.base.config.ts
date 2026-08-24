@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       'packages/shared/src/**/*.test.ts',
       'apps/server/src/**/*.test.ts',
+      'apps/control-plane/src/**/*.test.ts',
       'apps/web/src/**/*.test.ts',
       'apps/web/src/**/*.test.tsx',
     ],
