@@ -1,0 +1,14 @@
+{
+  "name": "@ssh-launchpad/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ssh-launchpad/shared": "*"
+  }
+}

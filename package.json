@@ -1,0 +1,34 @@
+{
+  "name": "ssh-launchpad",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0"
+  },
+  "workspaces": [
+    "apps/server",
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "build": "npm run build -w @ssh-launchpad/shared && npm run build -w @ssh-launchpad/web && npm run build -w @ssh-launchpad/server",
+    "dev": "concurrently -k \"npm run dev -w @ssh-launchpad/shared\" \"npm run dev -w @ssh-launchpad/web\" \"npm run dev -w @ssh-launchpad/server\"",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run --config vitest.base.config.ts",
+    "test:e2e": "playwright test",
+    "start": "npm run start -w @ssh-launchpad/server"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/node": "latest",
+    "@vitest/coverage-v8": "latest",
+    "concurrently": "latest",
+    "eslint": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
+  }
+}
