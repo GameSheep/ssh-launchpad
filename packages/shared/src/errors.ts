@@ -14,6 +14,10 @@ export type ErrorCode =
   | 'RESOURCE_BUSY'
   | 'NOT_FOUND'
   | 'FORBIDDEN'
+  | 'AGENT_OFFLINE'
+  | 'AGENT_TIMEOUT'
+  | 'PAIRING_INVALID'
+  | 'SESSION_INVALID'
   | 'INTERNAL_ERROR'
 
 export class LaunchpadError extends Error {
