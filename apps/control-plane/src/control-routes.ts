@@ -43,7 +43,16 @@ async function connect(request: FastifyRequest, dependencies: ControlRouteDepend
   const appId = params(request).id
   const app = dependencies.apps.get(appId)
   if (!app) throw new LaunchpadError('NOT_FOUND', 'Application was not found')
-  const result = await withCredential(dependencies, app.serverId, body(request).credential, (secret) => reconnect ? dependencies.runtime.reconnect(appId, secret) : dependencies.runtime.connect(appId, secret))
+  let result: { url?: string; status: 'healthy' }
+  try {
+    result = await withCredential(dependencies, app.serverId, body(request).credential, (secret) => reconnect ? dependencies.runtime.reconnect(appId, secret) : dependencies.runtime.connect(appId, secret))
+  } catch (error) {
+    if (error instanceof LaunchpadError && error.code === 'SSH_HOST_KEY_UNKNOWN') {
+      const candidate = error.details?.candidateFingerprint
+      if (typeof candidate === 'string' && candidate && dependencies.serverConnections.rememberCandidate) dependencies.serverConnections.rememberCandidate(app.serverId, candidate)
+    }
+    throw error
+  }
   return { url: publicAppUrl(dependencies.publicBaseUrl, appId), status: result.status }
 }
 
