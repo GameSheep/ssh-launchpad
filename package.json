@@ -12,13 +12,14 @@
   ],
   "scripts": {
     "build": "npm run build -w @ssh-launchpad/shared && npm run build -w @ssh-launchpad/web && npm run build -w @ssh-launchpad/server",
-    "dev": "concurrently -k \"npm run dev -w @ssh-launchpad/shared\" \"npm run dev -w @ssh-launchpad/web\" \"npm run dev -w @ssh-launchpad/server\"",
+    "dev": "concurrently -k \"npm run dev -w @ssh-launchpad/web\" \"npm run dev -w @ssh-launchpad/server\"",
     "lint": "eslint .",
     "typecheck": "npm run typecheck -ws --if-present",
     "test": "npm run test:unit",
     "test:unit": "vitest run --config vitest.base.config.ts",
     "test:e2e": "playwright test",
-    "start": "npm run start -w @ssh-launchpad/server"
+    "start": "npm run start -w @ssh-launchpad/server",
+    "credential:verify": "tsx scripts/verify-windows-credential.ts"
   },
   "devDependencies": {
     "@eslint/js": "latest",
